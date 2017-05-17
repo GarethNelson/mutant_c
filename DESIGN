@@ -1,0 +1,64 @@
+Features
+   Function currying
+   Single inheritance
+   Constructors and Destructors
+   Garbage collection / memory allocation
+
+Function currying
+   Basic mechanism behind OOP stuff as well as closures (essentially)
+      Used to create instance method functions at runtime
+      init() basically does curry(my_class_method, my_instance)
+      e.g
+          a class named my_class with a set(int i) method would be implemented by having init do this:
+            instance->set = curry(my_class_set,instance)
+          the function my_class_set would have the params my_class_set(my_class_t* this, int i)
+   Takes a function and a param as input, returns another function that calls the first with the specified parameter + other params
+   e.g
+      int add(a,b) { return a+b; }
+      inc = curry(add,1);
+
+      will produce an "inc" function equivalent to this:
+      int inc(int b) { return 1+b; }
+
+Single inheritance
+   Every class struct has parent as first member
+   When a child_class_t* pointer is cast to parent_class_t* the parent's fields can be accessed
+   Function overriding:
+      function to be overridden is present in the child class
+      init() updates function pointer in parent AND child unless different behaviour is desired depending on whether method is invoked from a pointer of child_class_t* type or parent_class_t* type
+
+Constructors and Destructors
+   All classes have a root class with init() and destroy() which should be overridden
+   size_t instance_size should exist in the class base as well
+   init(class_t* instance, gc_allocator_class_t* allocator) is called after an instance has raw memory allocated and is used to fill in the appropriate data, allocator should be used for handling allocation
+   destroy(class_t* instance, gc_allocator_class_t* allocator) is called if an instance is about to be de-allocated and should be used to clean up resources, including calling destroy() on any references
+   the root class should store the allocator as a reference
+
+
+Garbage collection
+   Implemented with boehm for now - longtime will look into more efficient algorithms
+   gc_allocator class - perhaps make a subclass of a general allocator class
+      prealloc(size_t s, size_t num) pre-allocates enough space for num objects of size s - i.e expands the heap by that amount, but does not perform actual allocation
+      alloc(size_t s)                returns a void* pointer to garbage collected memory, the new memory is zero-filled
+      free(void* obj)                frees previously allocated memory
+      new(class_t* obj_base)         allocates memory and then uses obj_base->init() to set it up, returning a pointer
+      delete(class_t* obj)           calls obj->destroy() and then uses free() to de-allocate it
+      gc_collect_little()            runs the garbage collector a little - if this is not supported by the underlying mechanism, this is basically a NOP
+      gc_collect_full()              runs the garbage collector with a full world stop
+      gc_disable()                   disables the garbage collector
+      gc_enable()                    re-enables the garbage collector
+
+
+Creating instances
+   new() is called:
+      my_class_t* my_instance = my_allocator->new(my_class_base)
+   new() allocates memory of size my_class_base.instance_size and calls my_class_base.init() on it
+   my_class_base_init cases the class_t* pointer to my_class_t* and does setup as required
+   new() returns the result from my_class_base.init()
+
+Deleting instances
+   delete() is called:
+     my_allocator->delete((class_t*)my_instance)
+   delete() invokes my_instance->destroy()
+   my_instance->destroy() invokes my_allocator->destroy() on any objects it references UNLESS those references are shared, in which case it simply sets the pointer member to NULL
+   delete() frees the underlying memory

@@ -1,0 +1,93 @@
+//-----------------------------------------------------------------------------
+//
+// Copyright (C) 2017 by Gareth Nelson (gareth@garethnelson.com)
+//
+// This file is part of MutantC.
+//
+// MutantC is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 2 of the License, or
+// (at your option) any later version.
+//
+// MutantC is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with MutantC.  If not, see <http://www.gnu.org/licenses/>.
+//
+//-----------------------------------------------------------------------------
+
+#include <malloc.h>
+
+#include <mutant/base_class.h>
+#include <mutant/gc_allocator_class.h>
+#include <mutant/curry_func.h>
+
+// these 2 functions should not be confused with new/delete - these are init/destroy for the allocator itself, NOT for objects it allocates
+void gc_allocator_class_init   (gc_allocator_class_t* this, gc_allocator_class_t* allocator);
+void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t* allocator);
+
+// curried functions
+void  gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t num);
+void* gc_allocator_class_alloc   (gc_allocator_class_t* this, size_t s);
+void  gc_allocator_class_free    (gc_allocator_class_t* this, void* obj);
+
+// utility function to initialise a root allocator, basically by calling init() on gc_allocator_class_base and then returning base
+gc_allocator_class_t* init_root_allocator();
+
+gc_allocator_class_t* init_root_allocator() {
+     gc_allocator_class_init(&gc_allocator_class_base, &gc_allocator_class_base);
+     return &gc_allocator_class_base;
+}
+
+gc_allocator_class_t gc_allocator_class_base = {
+     .Parent = {
+         .instance_size = sizeof(gc_allocator_class_t),
+         ._allocator    = &gc_allocator_class_base,
+         .init          = (ClassInit)gc_allocator_class_init,
+     },
+};
+
+
+void gc_allocator_class_init(gc_allocator_class_t* this, gc_allocator_class_t* allocator) {
+     // we save the allocator here in case a future algorithm for some reason needs a hierarchy of allocators for some reason
+     this->Parent._allocator = allocator;
+     
+     // destroy() needs to be curried in most classes, here it doesn't really do anything but we still curry it just in case it makes sense later, and as an example
+     this->Parent.destroy = curry_func(gc_allocator_class_destroy, this);
+
+     // curry the actual methods
+     this->prealloc = curry_func(gc_allocator_class_prealloc, this);
+     this->alloc    = curry_func(gc_allocator_class_alloc,    this);
+     this->free     = curry_func(gc_allocator_class_free,     this);
+}
+
+void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t* allocator) {
+     // all we do here is uncurry stuff
+     free_curry(this->Parent.destroy);
+     this->Parent.destroy = NULL;
+
+     free_curry(this->prealloc);
+     this->prealloc = NULL;
+
+     free_curry(this->alloc);
+     this->alloc = NULL;
+
+     free_curry(this->free);
+     this->free = NULL;
+}
+
+void gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t num) {
+     // currently a NOP
+}
+
+void* gc_allocator_class_alloc(gc_allocator_class_t* this, size_t s) {
+     // currently the this param is ignored, but it's left in place here both as an example and to leave space for future implementations of GC algorithms
+     return malloc(s);
+}
+
+void gc_allocator_class_free(gc_allocator_class_t* this, void* obj) {
+     free(obj);
+}
