@@ -81,6 +81,7 @@ void fancy_readline_redisplay() {
         display_main_frl_prompt();
         fflush(stdout);
      }
+     
      for(i=0; i<strlen(cur_frl_input); i++) {
          if(cur_frl_input[i]=='\n') {
             printf("\n\r\x1b[0K");
@@ -161,11 +162,14 @@ int fancy_readline_read_esc() {
 }
 
 void fancy_readline_addchar(char c) {
-     cur_frl_input = realloc(cur_frl_input,cur_frl_input_len+2); // always remember the NULL terminator
-     cur_frl_input[cur_frl_input_len]   = c;
-     cur_frl_input[cur_frl_input_len+1] = 0;
+     if(cur_cursor_offs == cur_frl_input_len) {
+        cur_frl_input = realloc(cur_frl_input,cur_frl_input_len+2); // always remember the NULL terminator
+        cur_frl_input[cur_frl_input_len]   = c;
+        cur_frl_input[cur_frl_input_len+1] = 0;
+     }
      cur_frl_input_len++;
      cur_cursor_offs++;
+     fprintf(stderr,"Cursor offset: %d, input length: %d\n",cur_cursor_offs,(int)cur_frl_input_len);
 }
 
 void fancy_readline_addstr(char* s) {
@@ -186,7 +190,12 @@ int fancy_readline_calc_indent(char* s) {
     }
 }
 
-
+void fancy_readline_backspace() {
+     if(cur_frl_input_len <= 0) return;
+     cur_frl_input[cur_cursor_offs-1] = 0;
+     cur_cursor_offs--;
+     cur_frl_input_len--;
+}
 
 void fancy_readline_handle_logical_char(int logical_key, char raw_c) {
      int i=0;
@@ -213,6 +222,11 @@ void fancy_readline_handle_logical_char(int logical_key, char raw_c) {
         break;
         case LOGICAL_KEY_ASCII:
              fancy_readline_addchar(raw_c);
+             fancy_readline_redisplay();
+        break;
+        case LOGICAL_KEY_BACKSPACE:
+             fancy_readline_backspace();
+             printf("\b \b");
              fancy_readline_redisplay();
         break;
         case LOGICAL_KEY_ENTER:
