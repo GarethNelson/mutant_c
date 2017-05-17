@@ -218,6 +218,14 @@ void fancy_readline_moveleft() {
      fancy_readline_redisplay();
 }
 
+void fancy_readline_moveright() {
+     if(cur_cursor_offs == cur_frl_input_len) return; // TODO: take screen width into account here
+     cur_cursor_offs++;
+     cur_cursor_col++;
+     printf("\x1b[%dC",1);
+     fancy_readline_redisplay();
+}
+
 void fancy_readline_handle_logical_char(int logical_key, char raw_c) {
      int i=0;
 /*
@@ -251,6 +259,9 @@ void fancy_readline_handle_logical_char(int logical_key, char raw_c) {
         break;
         case LOGICAL_KEY_LEFT:
              fancy_readline_moveleft();
+        break;
+        case LOGICAL_KEY_RIGHT:
+             fancy_readline_moveright();
         break;
         case LOGICAL_KEY_ENTER:
              cur_frl_input_lines++;
