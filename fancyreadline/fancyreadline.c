@@ -18,6 +18,8 @@ int   frl_prompt_len      = 0;
 int   cur_frl_line_indent = 0;
 int   cur_frl_input_lines = 0;
 int   cur_cursor_offs     = 0; // offset into the current input line that the cursor is located at
+int   cur_cursor_line     = 0; // what line of the input the cursor is on
+int   cur_cursor_col      = 0; // what screen column the cursor is on
 bool   done_display       = false;
 
 // represents keys as raw single characters read from stdin
@@ -82,6 +84,8 @@ void fancy_readline_redisplay() {
         fflush(stdout);
      }
      
+     if(cur_frl_input_len==0) return;
+     
      for(i=0; i<strlen(cur_frl_input); i++) {
          if(cur_frl_input[i]=='\n') {
             printf("\n\r\x1b[0K");
@@ -91,12 +95,14 @@ void fancy_readline_redisplay() {
          }
      }
      done_display = true;
+     if(cur_cursor_col >= (frl_prompt_len+2)) printf("\r\x1b[%dC",cur_cursor_col);
      fflush(stdout);
 }
 
 void start_fancy_readline(char* prompt) {
      frl_prompt     = strdup(prompt);
      frl_prompt_len = strlen(prompt);
+     cur_cursor_col = frl_prompt_len+2;
      display_main_frl_prompt();
 }
 
@@ -169,6 +175,7 @@ void fancy_readline_addchar(char c) {
      }
      cur_frl_input_len++;
      cur_cursor_offs++;
+     cur_cursor_col++; // TODO - take width of terminal into account here and wrap or something
      fprintf(stderr,"Cursor offset: %d, input length: %d\n",cur_cursor_offs,(int)cur_frl_input_len);
 }
 
@@ -177,6 +184,8 @@ void fancy_readline_addstr(char* s) {
      cur_frl_input = realloc(cur_frl_input,new_len);
      strncpy(cur_frl_input+cur_frl_input_len,s,new_len);
      cur_frl_input_len = new_len;
+     cur_cursor_offs += strlen(s);
+     cur_cursor_col  += strlen(s);
 }
 
 // calculates the indent (number of spaces) in the last line of string s
@@ -191,10 +200,22 @@ int fancy_readline_calc_indent(char* s) {
 }
 
 void fancy_readline_backspace() {
+     if(cur_cursor_col <= (frl_prompt_len+2)) return;
      if(cur_frl_input_len <= 0) return;
      cur_frl_input[cur_cursor_offs-1] = 0;
      cur_cursor_offs--;
+     cur_cursor_col--;
      cur_frl_input_len--;
+     printf("\b \b");
+     fancy_readline_redisplay();
+}
+
+void fancy_readline_moveleft() {
+     if(cur_cursor_col <= (frl_prompt_len+2)) return; // TODO: handle going to the previous line
+     cur_cursor_offs--;
+     cur_cursor_col--;
+     printf("\b");
+     fancy_readline_redisplay();
 }
 
 void fancy_readline_handle_logical_char(int logical_key, char raw_c) {
@@ -226,13 +247,16 @@ void fancy_readline_handle_logical_char(int logical_key, char raw_c) {
         break;
         case LOGICAL_KEY_BACKSPACE:
              fancy_readline_backspace();
-             printf("\b \b");
-             fancy_readline_redisplay();
+
+        break;
+        case LOGICAL_KEY_LEFT:
+             fancy_readline_moveleft();
         break;
         case LOGICAL_KEY_ENTER:
              cur_frl_input_lines++;
              cur_frl_line_indent = fancy_readline_calc_indent(cur_frl_input);
              fancy_readline_addchar('\n');
+             cur_cursor_col = frl_prompt_len+2;
              for(i=0; i<cur_frl_line_indent; i++) fancy_readline_addchar(' '); // TODO - make this more efficient
              // TODO - check if we need to do complete callback here
              printf("\n\r");
