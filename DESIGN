@@ -3,6 +3,7 @@ Features
    Single inheritance
    Constructors and Destructors
    Garbage collection / memory allocation
+   Fancy readline
 
 Function currying
    Basic mechanism behind OOP stuff as well as closures (essentially)
@@ -62,3 +63,15 @@ Deleting instances
    delete() invokes my_instance->destroy()
    my_instance->destroy() invokes my_allocator->destroy() on any objects it references UNLESS those references are shared, in which case it simply sets the pointer member to NULL
    delete() frees the underlying memory
+
+Fancy readline
+   read from any FD and get back parsed s-expression
+   if a file:
+      read s-expressions one by one
+   if a socket:
+      try to implement similar functionality to TTY
+   if a TTY:
+      use curses and call an idle function while waiting for input
+      show syntax hints and autocomplete by using callbacks
+           one for every time the string changes
+           one for every time the user hits tab

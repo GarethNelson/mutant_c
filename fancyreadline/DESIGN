@@ -1,0 +1,9 @@
+currently this is all a big messy hack, don't even try to use it - consider it a work in progress
+
+for every character input:
+    if left arrow, go back one character to the left
+    if right arrow and not at end of line, go one character right
+    if enter:
+       if expression is complete, trigger callback
+       otherwise, append newline to string along with autoindent stuff
+
