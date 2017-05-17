@@ -72,7 +72,7 @@ void string_class_set(string_class_t* this, char* s) {
      }
 
      // now we allocate a new s_val and then set the value
-     this->s_val = this->Parent._allocator->alloc(strlen(s)+1); // always add one byte to account for NULL terminator
+     this->s_val = this->Parent._allocator->alloc_atomic(strlen(s)+1); // always add one byte to account for NULL terminator
      snprintf(this->s_val,strlen(s)+1,"%s",s);
 }
 

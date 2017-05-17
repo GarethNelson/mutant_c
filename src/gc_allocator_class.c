@@ -19,20 +19,25 @@
 //
 //-----------------------------------------------------------------------------
 
-#include <malloc.h>
+#include <gc.h>
 
 #include <mutant/base_class.h>
 #include <mutant/gc_allocator_class.h>
 #include <mutant/curry_func.h>
+
+#include <stdbool.h>
+
+static bool done_gc_init = false;
 
 // these 2 functions should not be confused with new/delete - these are init/destroy for the allocator itself, NOT for objects it allocates
 void gc_allocator_class_init   (gc_allocator_class_t* this, gc_allocator_class_t* allocator);
 void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t* allocator);
 
 // curried functions
-void  gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t num);
-void* gc_allocator_class_alloc   (gc_allocator_class_t* this, size_t s);
-void  gc_allocator_class_free    (gc_allocator_class_t* this, void* obj);
+void  gc_allocator_class_prealloc    (gc_allocator_class_t* this, size_t s, size_t num);
+void* gc_allocator_class_alloc       (gc_allocator_class_t* this, size_t s);
+void* gc_allocator_class_alloc_atomic(gc_allocator_class_t* this, size_t s);
+void  gc_allocator_class_free        (gc_allocator_class_t* this, void* obj);
 
 base_class_t* gc_allocator_class_new   (gc_allocator_class_t* this, base_class_t* obj_base);
 void          gc_allocator_class_delete(gc_allocator_class_t* this, base_class_t* obj);
@@ -41,6 +46,10 @@ void          gc_allocator_class_delete(gc_allocator_class_t* this, base_class_t
 gc_allocator_class_t* init_root_allocator();
 
 gc_allocator_class_t* init_root_allocator() {
+     if(!done_gc_init) {
+        GC_INIT(); // this should be done once and only once
+        done_gc_init = true;
+     }
      gc_allocator_class_init(&gc_allocator_class_base, &gc_allocator_class_base);
      return &gc_allocator_class_base;
 }
@@ -62,11 +71,12 @@ void gc_allocator_class_init(gc_allocator_class_t* this, gc_allocator_class_t* a
      this->Parent.destroy = curry_func(gc_allocator_class_destroy, this);
 
      // curry the actual methods
-     this->prealloc = curry_func(gc_allocator_class_prealloc, this);
-     this->alloc    = curry_func(gc_allocator_class_alloc,    this);
-     this->free     = curry_func(gc_allocator_class_free,     this);
-     this->new      = curry_func(gc_allocator_class_new,      this);
-     this->delete   = curry_func(gc_allocator_class_delete,   this);
+     this->prealloc     = curry_func(gc_allocator_class_prealloc,     this);
+     this->alloc        = curry_func(gc_allocator_class_alloc,        this);
+     this->alloc_atomic = curry_func(gc_allocator_class_alloc_atomic, this);
+     this->free         = curry_func(gc_allocator_class_free,         this);
+     this->new          = curry_func(gc_allocator_class_new,          this);
+     this->delete       = curry_func(gc_allocator_class_delete,       this);
 }
 
 void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t* allocator) {
@@ -96,11 +106,11 @@ void gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t nu
 
 void* gc_allocator_class_alloc(gc_allocator_class_t* this, size_t s) {
      // currently the this param is ignored, but it's left in place here both as an example and to leave space for future implementations of GC algorithms
-     return malloc(s);
+     return GC_MALLOC(s);
 }
 
 void gc_allocator_class_free(gc_allocator_class_t* this, void* obj) {
-     free(obj);
+     GC_FREE(obj);
 }
 
 base_class_t* gc_allocator_class_new(gc_allocator_class_t* this, base_class_t* obj_base) {
@@ -114,4 +124,8 @@ void gc_allocator_class_delete(gc_allocator_class_t* this, base_class_t* obj) {
      free_curry(obj->destroy);
      obj->destroy = NULL;
      this->free(obj);
+}
+
+void* gc_allocator_class_alloc_atomic(gc_allocator_class_t* this, size_t s) {
+     return GC_MALLOC_ATOMIC(s);
 }
