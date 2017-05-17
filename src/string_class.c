@@ -78,5 +78,5 @@ void string_class_set(string_class_t* this, char* s) {
 
 void string_class_print(string_class_t* this) {
      // this is stupidly simple
-     if(this->s_val != NULL) printf("%s\n",this->s_val);
+     if(this->s_val != NULL) printf("%s",this->s_val);
 }

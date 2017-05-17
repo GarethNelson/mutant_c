@@ -7,17 +7,21 @@
 int main(int argc, char** argv) {
     gc_allocator_class_t* my_allocator = init_root_allocator();
 
-    string_class_t* string_a = my_allocator->alloc(sizeof(string_class_t));
-    string_class_init(string_a, my_allocator);
+    string_class_t* string_a = my_allocator->new(&string_class_base);
+    string_class_t* string_b = my_allocator->new(&string_class_base);
 
     string_a->set("TEST 1\n");
     string_a->print();
 
-/*    string_class_t* string_a = string_class_new();
-
-    char* test_str = "TEST 1\n";
-    string_a->setstr(test_str);
-
+    string_a->set("TEST 2\n");
     string_a->print();
-    string_a->Parent.DELETE(string_a);*/
+
+    string_b->set("TEST 3\n");
+    string_b->print();
+
+    my_allocator->delete(string_a);
+    string_b->set("TEST 4\n");
+    string_b->print();
+
+    my_allocator->delete(string_b);
 }

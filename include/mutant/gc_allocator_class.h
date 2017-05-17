@@ -28,9 +28,11 @@
 typedef struct gc_allocator_class_t gc_allocator_class_t;
 typedef struct gc_allocator_class_t {
     base_class_t Parent;
-    void  (*prealloc)(size_t s, size_t num);
-    void* (*alloc)   (size_t s);
-    void  (*free)    (void* obj);
+    void          (*prealloc)(size_t s, size_t num);
+    void*         (*alloc)   (size_t s);
+    void          (*free)    (void* obj);
+    void*         (*new)(void* obj_base);
+    void          (*delete)(void* obj);
 } gc_allocator_class_t;
 
 gc_allocator_class_t gc_allocator_class_base;

@@ -38,8 +38,8 @@ static unsigned char curry_tramp_x86_64_code[] = {
 #define CURRY_TRAMP                curry_tramp_x86_64_code
 #define CURRY_TRAMP_PARAM_OFFSET   5
 #define CURRY_TRAMP_FUNCPTR_OFFSET 15
-#define CURRY_TRAMP_PARAMPTR_TYPE  uint64_t*
-#define CURRY_TRAMP_FUNCPTR_TYPE   uint64_t*
+#define CURRY_TRAMP_PARAMPTR_TYPE  uint64_t
+#define CURRY_TRAMP_FUNCPTR_TYPE   uint64_t
 
 void* curry_func(void* func, void* param) {
       void* curry_mem            = mmap(NULL, sizeof(CURRY_TRAMP), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
@@ -47,11 +47,11 @@ void* curry_func(void* func, void* param) {
 
       memcpy(curry_mem, CURRY_TRAMP, sizeof(CURRY_TRAMP));
 
-      CURRY_TRAMP_PARAMPTR_TYPE func_param_ptr  = (CURRY_TRAMP_PARAMPTR_TYPE)&(mapped_code[CURRY_TRAMP_PARAM_OFFSET]);
-      func_param_ptr[0]                         = (CURRY_TRAMP_PARAMPTR_TYPE)param;
+      CURRY_TRAMP_PARAMPTR_TYPE *func_param_ptr  = (CURRY_TRAMP_PARAMPTR_TYPE *)&(mapped_code[CURRY_TRAMP_PARAM_OFFSET]);
+      func_param_ptr[0]                          = (CURRY_TRAMP_PARAMPTR_TYPE)param;
 
-      CURRY_TRAMP_FUNCPTR_TYPE func_addr_ptr    = (CURRY_TRAMP_FUNCPTR_TYPE)&(mapped_code[CURRY_TRAMP_FUNCPTR_OFFSET]);
-      func_addr_ptr[0]                          = (CURRY_TRAMP_FUNCPTR_TYPE)func;
+      CURRY_TRAMP_FUNCPTR_TYPE *func_addr_ptr    = (CURRY_TRAMP_FUNCPTR_TYPE *)&(mapped_code[CURRY_TRAMP_FUNCPTR_OFFSET]);
+      func_addr_ptr[0]                           = (CURRY_TRAMP_FUNCPTR_TYPE)func;
 
       mprotect(curry_mem, sizeof(CURRY_TRAMP), PROT_READ | PROT_EXEC); // https://www.openbsd.org/lyrics.html#33
       return curry_mem;

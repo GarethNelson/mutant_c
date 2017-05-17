@@ -34,6 +34,9 @@ void  gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t n
 void* gc_allocator_class_alloc   (gc_allocator_class_t* this, size_t s);
 void  gc_allocator_class_free    (gc_allocator_class_t* this, void* obj);
 
+base_class_t* gc_allocator_class_new   (gc_allocator_class_t* this, base_class_t* obj_base);
+void          gc_allocator_class_delete(gc_allocator_class_t* this, base_class_t* obj);
+
 // utility function to initialise a root allocator, basically by calling init() on gc_allocator_class_base and then returning base
 gc_allocator_class_t* init_root_allocator();
 
@@ -62,6 +65,8 @@ void gc_allocator_class_init(gc_allocator_class_t* this, gc_allocator_class_t* a
      this->prealloc = curry_func(gc_allocator_class_prealloc, this);
      this->alloc    = curry_func(gc_allocator_class_alloc,    this);
      this->free     = curry_func(gc_allocator_class_free,     this);
+     this->new      = curry_func(gc_allocator_class_new,      this);
+     this->delete   = curry_func(gc_allocator_class_delete,   this);
 }
 
 void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t* allocator) {
@@ -77,6 +82,12 @@ void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t
 
      free_curry(this->free);
      this->free = NULL;
+
+     free_curry(this->new);
+     this->free = NULL;
+
+     free_curry(this->delete);
+     this->free = NULL;
 }
 
 void gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t num) {
@@ -90,4 +101,17 @@ void* gc_allocator_class_alloc(gc_allocator_class_t* this, size_t s) {
 
 void gc_allocator_class_free(gc_allocator_class_t* this, void* obj) {
      free(obj);
+}
+
+base_class_t* gc_allocator_class_new(gc_allocator_class_t* this, base_class_t* obj_base) {
+     base_class_t* retval = this->alloc(obj_base->instance_size);
+     obj_base->init(retval, this);
+     return retval;
+}
+
+void gc_allocator_class_delete(gc_allocator_class_t* this, base_class_t* obj) {
+     obj->destroy(this);
+     free_curry(obj->destroy);
+     obj->destroy = NULL;
+     this->free(obj);
 }
