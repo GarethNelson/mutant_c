@@ -1,17 +1,27 @@
 #include <gc.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
+
 #include <sys/select.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
+
 #include <stdbool.h>
 #include <string.h>
 #include <malloc.h>
 #include <termios.h>
+#include <termcap.h>
+
+#include <signal.h>
 
 struct termios frl_orig_termios;
 struct termios frl_cur_termios;
 char* cur_frl_input      = NULL;
 size_t cur_frl_input_len = 0;
+
+int term_rows = 0;
+int term_cols = 0;
 
 char* frl_prompt          = NULL;
 int   frl_prompt_len      = 0;
@@ -53,7 +63,23 @@ enum LOGICAL_KEYS {
 void idle() {
 }
 
+
+void fancy_readline_get_termsize() {
+     char *termtype = getenv("TERM");
+     char buf[2048];
+     tgetent(buf,termtype);
+     term_rows = tgetnum("li");
+     term_cols = tgetnum("co");
+}
+
+
+void sigwinchhandler (int sig) {
+     fancy_readline_get_termsize();
+}
+
 void init_fancy_readline() {
+     fancy_readline_get_termsize();
+     signal(SIGWINCH,sigwinchhandler);
      setvbuf(stdout, NULL, _IONBF, BUFSIZ);
      tcgetattr(STDIN_FILENO,&frl_orig_termios);
 
