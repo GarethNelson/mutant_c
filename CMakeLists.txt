@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 3.0)
 
+set(CMAKE_C_FLAGS "-std=gnu99")
+set(CMAKE_C_STANDARD 99)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/")
 
 file(GLOB LIBMUTANT_SOURCE  "src/*.c")

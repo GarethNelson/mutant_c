@@ -10,7 +10,7 @@
 #endif
 
 #include <assert.h>
-#include "rope.h"
+#include <mutant/librope/rope.h>
 
 // The number of bytes the rope head structure takes up
 static const size_t ROPE_SIZE = sizeof(rope) + sizeof(rope_node) * ROPE_MAX_HEIGHT;

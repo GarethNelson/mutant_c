@@ -50,11 +50,12 @@ void string_class_init(string_class_t* this, gc_allocator_class_t* allocator) {
      this->set   = curry_func(string_class_set,   this);
      this->print = curry_func(string_class_print, this);
 
+     this->s_val = rope_new2(allocator->alloc,allocator->realloc,allocator->free);
 }
 
 void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator) {
      if(this->s_val != NULL) {
-        allocator->free(this->s_val);
+        rope_free(this->s_val); // librope does it's own allocation stuff inside
         this->s_val = NULL;
      }
 
@@ -64,21 +65,17 @@ void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator)
      free_curry(this->print);
      this->print = NULL;
 
-     // TODO: add something in gc_allocator_class_t to free destroy() curry
 }
 
 void string_class_set(string_class_t* this, char* s) {
-     // first we just free the old s_val - there's a more efficient way to do this that will be done later
-     if(this->s_val != NULL) {
-        this->Parent._allocator->free(this->s_val);
-     }
-
-     // now we allocate a new s_val and then set the value
-     this->s_val = this->Parent._allocator->alloc_atomic(strlen(s)+1); // always add one byte to account for NULL terminator
-     snprintf(this->s_val,strlen(s)+1,"%s",s);
+     size_t ccount = rope_char_count(this->s_val);
+     rope_del(this->s_val,0,ccount);
+     rope_insert(this->s_val,0,s);
 }
 
 void string_class_print(string_class_t* this) {
-     // this is stupidly simple
-     if(this->s_val != NULL) printf("%s",this->s_val);
+     if(this->s_val == NULL) return;
+     ROPE_FOREACH(this->s_val, iter) {
+         printf("%s", rope_node_data(iter));
+     }
 }

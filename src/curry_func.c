@@ -23,21 +23,49 @@
 #include <string.h>
 #include <stdint.h>
 
-// currently only works with a single param being passed to the curried function because i'm a lazy fucker
-// as seen before, also only works on x86-64, at some point i'll add support for 32-bit x86 and possibly ARM
-// i am however, a lazy fucker
+
+// how this works in brief:
+//     function calls come into this code with params passed in registers (like any other C function) RDI, RSI, RDX, RCX, R8, R9
+//     we want to move the params around so that the first param is the curried param (for example, the "this" param for class methods)
+//     we'll call the curried param 0xFEEDFACEDEADBEEF in the explanation below, because steak is delicious
+
+//     so we need to set things up like this:
+//        rdi becomes 0xFEEDFACEDEADBEEF
+//        rsi becomes the old value of rdi
+//        rdx becomes the old value of rsi
+//        rcx becomes the old value of rdx
+//        r8  becomes the old value of rcx
+//        r9  becomes the old value of r8
+
+//     because of registers being altered though (we lose the old value) we have to do this backwards:
+//        r9  is set to the value of r8
+//        r8  is set to the value of rcx
+//        rcx is set to the value of rdx
+//        rdx is set to the value of rsi
+//        rsi is set to the value of rdi
+//        rdi is set to 0xFEEDFACEDEADBEEF
+//
+//     after that is all setup, we set the value of RAX to the address of the original function and then do a JMP RAX
+//     the original function can now execute (with remapped params), and since we never touched the stack, it'll return to the caller of this trampoline code
+//
+// the code to do all this is stored here as x86-64 plain machine code with literal values for 0xFEEDFACEDEADBEEF, this is copied into a new mmap()-allocated buffer and modified
+
 static unsigned char curry_tramp_x86_64_code[] = {
-   0x48, 0x89, 0xfe, // mov rsi,rdi
+   0x4d, 0x89, 0xc1, // mov r9, r8
+   0xf9, 0x89, 0xc8, // mov r8, rcx
+   0x48, 0x89, 0xd1, // mov rcx, rdx
+   0x48, 0x89, 0xf2, // mov rdx, rsi
+   0x48, 0x89, 0xfe, // mov rsi, rdi
    0x48, 0xbf,       // movabs rdi
    0xef, 0xbe, 0xad, 0xde, 0xce, 0xfa, 0xed, 0xfe, // 0xFEEDFACEDEADBEEF - the curried param
    0x48, 0xb8,       // movabs rax
    0xef, 0xbe, 0xad, 0xde, 0xce, 0xfa, 0xed, 0xfe, // 0xFEEDFACEDEADBEEF - function
-   0xff, 0xe0        // ret
+   0xff, 0xe0        // jmp rax
 };
 
 #define CURRY_TRAMP                curry_tramp_x86_64_code
-#define CURRY_TRAMP_PARAM_OFFSET   5
-#define CURRY_TRAMP_FUNCPTR_OFFSET 15
+#define CURRY_TRAMP_PARAM_OFFSET   17
+#define CURRY_TRAMP_FUNCPTR_OFFSET 27
 #define CURRY_TRAMP_PARAMPTR_TYPE  uint64_t
 #define CURRY_TRAMP_FUNCPTR_TYPE   uint64_t
 
