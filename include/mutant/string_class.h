@@ -22,12 +22,13 @@
 #pragma once
 
 #include <mutant/base_class.h>
+#include <mutant/librope/rope.h>
 
 typedef struct string_class_t string_class_t;
 typedef struct string_class_t {
     base_class_t Parent;
     
-    char* s_val;
+    rope *s_val;
 
     void (*set)  (char* s);
     void (*print)();

@@ -36,6 +36,7 @@ void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t
 // curried functions
 void  gc_allocator_class_prealloc    (gc_allocator_class_t* this, size_t s, size_t num);
 void* gc_allocator_class_alloc       (gc_allocator_class_t* this, size_t s);
+void* gc_allocator_class_realloc     (gc_allocator_class_t* this, void* obj, size_t new_size);
 void* gc_allocator_class_alloc_atomic(gc_allocator_class_t* this, size_t s);
 void  gc_allocator_class_free        (gc_allocator_class_t* this, void* obj);
 
@@ -73,6 +74,7 @@ void gc_allocator_class_init(gc_allocator_class_t* this, gc_allocator_class_t* a
      // curry the actual methods
      this->prealloc     = curry_func(gc_allocator_class_prealloc,     this);
      this->alloc        = curry_func(gc_allocator_class_alloc,        this);
+     this->realloc      = curry_func(gc_allocator_class_realloc,      this);
      this->alloc_atomic = curry_func(gc_allocator_class_alloc_atomic, this);
      this->free         = curry_func(gc_allocator_class_free,         this);
      this->new          = curry_func(gc_allocator_class_new,          this);
@@ -89,6 +91,9 @@ void gc_allocator_class_destroy(gc_allocator_class_t* this, gc_allocator_class_t
 
      free_curry(this->alloc);
      this->alloc = NULL;
+
+     free_curry(this->realloc);
+     this->realloc = NULL;
 
      free_curry(this->free);
      this->free = NULL;
@@ -107,6 +112,11 @@ void gc_allocator_class_prealloc(gc_allocator_class_t* this, size_t s, size_t nu
 void* gc_allocator_class_alloc(gc_allocator_class_t* this, size_t s) {
      // currently the this param is ignored, but it's left in place here both as an example and to leave space for future implementations of GC algorithms
      return GC_MALLOC(s);
+}
+
+void* gc_allocator_class_realloc(gc_allocator_class_t* this, void* obj, size_t s) {
+     // currently the this param is ignored, but it's left in place here both as an example and to leave space for future implementations of GC algorithms
+     return GC_REALLOC(obj,s);
 }
 
 void gc_allocator_class_free(gc_allocator_class_t* this, void* obj) {

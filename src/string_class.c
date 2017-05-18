@@ -22,6 +22,7 @@
 #include <mutant/gc_allocator_class.h>
 #include <mutant/string_class.h>
 #include <mutant/curry_func.h>
+#include <mutant/librope/rope.h>
 
 #include <string.h>
 #include <stdio.h>
@@ -48,6 +49,7 @@ void string_class_init(string_class_t* this, gc_allocator_class_t* allocator) {
 
      this->set   = curry_func(string_class_set,   this);
      this->print = curry_func(string_class_print, this);
+
 }
 
 void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator) {
