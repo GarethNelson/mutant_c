@@ -30,6 +30,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include <unistd.h>
+
 #include <termios.h>
 #include <termcap.h>
 
@@ -37,6 +39,7 @@ void posix_terminal_class_init   (posix_terminal_class_t* this, gc_allocator_cla
 void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_class_t* allocator);
 
 void                  posix_terminal_class_setup_term   (posix_terminal_class_t* this);
+void                  posix_terminal_class_restore_term (posix_terminal_class_t* this);
 void                  posix_terminal_class_sig_handle   (posix_terminal_class_t* this, int signum);
 posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this);
 
@@ -54,6 +57,7 @@ void posix_terminal_class_init(posix_terminal_class_t* this, gc_allocator_class_
      this->Parent.destroy = curry_func(posix_terminal_class_destroy, this);
 
      this->setup_term    = curry_func(posix_terminal_class_setup_term,    this);
+     this->restore_term  = curry_func(posix_terminal_class_restore_term,  this);
      this->sig_handle    = curry_func(posix_terminal_class_sig_handle,    this);
      this->get_term_size = curry_func(posix_terminal_class_get_term_size, this);
 }
@@ -62,6 +66,9 @@ void posix_terminal_class_init(posix_terminal_class_t* this, gc_allocator_class_
 void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_class_t* allocator) {
      free_curry(this->setup_term);
      this->setup_term = NULL;
+
+     free_curry(this->restore_term);
+     this->restore_term = NULL;
 
      free_curry(this->sig_handle);
      this->sig_handle = NULL;
@@ -72,7 +79,15 @@ void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_cla
 
 void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
      this->cur_size = this->get_term_size();
-     signal(SIGWINCH,this->sig_handle);
+     this->orig_sig_handler = signal(SIGWINCH,this->sig_handle);
+     setbuf(stdout, NULL); // alas, this can not be restored by restore_term, but that should not have any serious effects
+     tcgetattr(STDIN_FILENO,&(this->orig_termios));
+     this->cur_termios = this->orig_termios;
+     cfmakeraw(&(this->cur_termios));
+     this->cur_termios.c_cc[VMIN]  = 1;
+     this->cur_termios.c_cc[VTIME] = 0;
+     tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->cur_termios));
+     printf("\n");
 }
 
 posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this) {
@@ -84,6 +99,13 @@ posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t*
 
 }
 
+void posix_terminal_class_restore_term(posix_terminal_class_t* this) {
+     signal(SIGWINCH,this->orig_sig_handler);
+     tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->orig_termios));
+     printf("\n");
+}
+
 void posix_terminal_class_sig_handle(posix_terminal_class_t* this, int signum) {
+     if(this->orig_sig_handler != NULL) this->orig_sig_handler(signum);
      this->cur_size = this->get_term_size();
 }

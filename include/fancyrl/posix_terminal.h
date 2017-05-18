@@ -25,6 +25,7 @@
 #include <mutant/string_class.h>
 
 #include <termios.h>
+#include <signal.h>
 
 // the below is NOT a class
 typedef struct posix_terminal_size_t {
@@ -80,6 +81,8 @@ typedef struct posix_terminal_class_t {
 
     struct termios orig_termios; // original terminal settings
     struct termios cur_termios;  // current terminal settings (used by fancyrl)
+
+    void (*orig_sig_handler)(int signum); // original signal handler (so we can restore it in restore_term())
 
     void                     (*sig_handle)(int signum); // not meant to actually be called directly, signal handler for window resize etc
     posix_terminal_size_t    (*get_term_size)();

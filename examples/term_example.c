@@ -12,4 +12,7 @@ int main(int argc, char** argv) {
     term->setup_term();
     posix_terminal_size_t term_size = term->get_term_size();
     printf("Terminal is %dX%d\n", term_size.rows, term_size.cols);
+    term->restore_term();
+
+    my_allocator->delete(term);
 }
