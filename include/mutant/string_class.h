@@ -30,10 +30,11 @@ typedef struct string_class_t {
     
     rope *s_val;
 
-    void (*insert_cstr_at) (size_t pos, char* s); // sadly we can't do polymorphism on native C types
-    void (*append_cstr)    (char* s);
-    void (*set)            (char* s);
-    void (*print)();
+    size_t (*get_length)();
+    void   (*insert_cstr_at) (size_t pos, char* s); // sadly we can't do polymorphism on native C types
+    void   (*append_cstr)    (char* s);
+    void   (*set)            (char* s);
+    void   (*print)();
 
 } string_class_t;
 

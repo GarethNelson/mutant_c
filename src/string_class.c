@@ -30,10 +30,11 @@
 void string_class_init   (string_class_t* this, gc_allocator_class_t* allocator);
 void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator);
 
-void string_class_set           (string_class_t* this, char* s);
-void string_class_insert_cstr_at(string_class_t* this, size_t pos, char* s);
-void string_class_append_cstr   (string_class_t* this, char* s);
-void string_class_print         (string_class_t* this);
+size_t string_class_get_length    (string_class_t* this);
+void   string_class_set           (string_class_t* this, char* s);
+void   string_class_insert_cstr_at(string_class_t* this, size_t pos, char* s);
+void   string_class_append_cstr   (string_class_t* this, char* s);
+void   string_class_print         (string_class_t* this);
 
 string_class_t string_class_base = {
     .Parent = {
@@ -49,6 +50,8 @@ void string_class_init(string_class_t* this, gc_allocator_class_t* allocator) {
 
      this->Parent.destroy = curry_func(string_class_destroy, this);
 
+
+     this->get_length     = curry_func(string_class_get_length,     this);
      this->set            = curry_func(string_class_set,            this);
      this->insert_cstr_at = curry_func(string_class_insert_cstr_at, this);
      this->append_cstr    = curry_func(string_class_append_cstr,    this);
@@ -63,7 +66,13 @@ void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator)
         this->s_val = NULL;
      }
 
+     free_curry(this->get_length);
+     this->get_length = NULL;
+
      free_curry(this->insert_cstr_at);
+     this->insert_cstr_at = NULL;
+
+     free_curry(this->append_cstr);
      this->insert_cstr_at = NULL;
 
      free_curry(this->set);
@@ -72,6 +81,11 @@ void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator)
      free_curry(this->print);
      this->print = NULL;
 
+}
+
+
+size_t string_class_get_length(string_class_t* this) {
+       return rope_char_count(this->s_val);
 }
 
 void string_class_insert_cstr_at(string_class_t* this, size_t pos, char* s) {
@@ -89,7 +103,6 @@ void string_class_set(string_class_t* this, char* s) {
 }
 
 void string_class_print(string_class_t* this) {
-     if(this->s_val == NULL) return;
      ROPE_FOREACH(this->s_val, iter) {
          printf("%s", rope_node_data(iter));
      }

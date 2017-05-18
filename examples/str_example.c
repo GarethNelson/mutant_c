@@ -29,5 +29,8 @@ int main(int argc, char** argv) {
     string_c->insert_cstr_at(1,"ello world, th");
     string_c->append_cstr("s is a test\n");
     string_c->print();
+
+    printf("The above string is %d characters long\n",string_c->get_length());
     my_allocator->delete(string_c);
+
 }
