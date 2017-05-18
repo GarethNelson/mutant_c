@@ -53,51 +53,51 @@ char char_read(posix_terminal_class_t* term) {
                  // here we spit out some info about the key and then return the raw character code
                  switch(in_key.logical_key) {
                      case LOGICAL_KEY_UNKNOWN:
-                          term->write_cstr("\nI don't know what key that was!\n");
+                          term->write_cstr("\n\rI don't know what key that was!\n\r");
                      break;
                      case LOGICAL_KEY_INVALID:
-                          term->write_cstr("\nSomething went wrong when I read that key\n");
+                          term->write_cstr("\n\rSomething went wrong when I read that key\n\r");
                      break;
                      case LOGICAL_KEY_ASCII:
-                          term->write_cstr("\nThat was just a normal plain old ASCII character, it was this one: ");
+                          term->write_cstr("\n\rThat was just a normal plain old ASCII character, it was this one: ");
                           term->write_char(in_key.raw_char);
-                          term->write_char('\n');
+                          term->write_cstr("\n\r");
                      break;
                      case LOGICAL_KEY_TAB:
-                          term->write_cstr("\nYou pressed tab\n");
+                          term->write_cstr("\n\rYou pressed tab\n\r");
                      break;
                      case LOGICAL_KEY_ENTER:
-                          term->write_cstr("\nYou pressed enter\n");
+                          term->write_cstr("\n\rYou pressed enter\n\r");
                      break;
                      case LOGICAL_KEY_DEL:
-                          term->write_cstr("\nYou pressed delete\n");
+                          term->write_cstr("\n\rYou pressed delete\n\r");
                      break;
                      case LOGICAL_KEY_BACKSPACE:
-                          term->write_cstr("\nYou pressed backspace\n");
+                          term->write_cstr("\n\rYou pressed backspace\n\r");
                      break;
                      case LOGICAL_KEY_UP:
-                          term->write_cstr("\nYou pressed the up arrow\n");
+                          term->write_cstr("\n\rYou pressed the up arrow\n\r");
                      break;
                      case LOGICAL_KEY_DOWN:
-                          term->write_cstr("\nYou pressed the down arrow\n");
+                          term->write_cstr("\n\rYou pressed the down arrow\n\r");
                      break;
                      case LOGICAL_KEY_LEFT:
-                          term->write_cstr("\nYou pressed the left arrow\n");
+                          term->write_cstr("\n\rYou pressed the left arrow\n\r");
                      break;
                      case LOGICAL_KEY_RIGHT:
-                          term->write_cstr("\nYou pressed the right arrow\n");
+                          term->write_cstr("\n\rYou pressed the right arrow\n\r");
                      break;
                      case LOGICAL_KEY_HOME:
-                          term->write_cstr("\nYou pressed home\n");
+                          term->write_cstr("\n\rYou pressed home\n\r");
                      break;
                      case LOGICAL_KEY_END:
-                          term->write_cstr("\nMy only friend\n");
+                          term->write_cstr("\n\rMy only friend\n\r");
                      break;
                      case LOGICAL_KEY_CTRL_L:
-                          term->write_cstr("\nYou pressed Ctrl-L\n");
+                          term->write_cstr("\n\rYou pressed Ctrl-L\n\r");
                      break;
                      case LOGICAL_KEY_CTRL_C:
-                          term->write_cstr("\nYou pressed Ctrl-C\n");
+                          term->write_cstr("\n\rYou pressed Ctrl-C\n\r");
                      break;
                  }
                  return in_key.raw_char;
@@ -118,7 +118,7 @@ int main(int argc, char** argv) {
     snprintf(outbuf,128,"Terminal is %dX%d\n\r", term_size.rows, term_size.cols);
     term->write_cstr(outbuf);
 
-    printf("Press a key, any key");
+    term->write_cstr("Press a key, any key");
 
     char in_char = char_read(term);
 

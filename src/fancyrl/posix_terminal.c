@@ -38,11 +38,16 @@
 void posix_terminal_class_init   (posix_terminal_class_t* this, gc_allocator_class_t* allocator);
 void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_class_t* allocator);
 
-void                  posix_terminal_class_setup_term   (posix_terminal_class_t* this);
-void                  posix_terminal_class_restore_term (posix_terminal_class_t* this);
-void                  posix_terminal_class_sig_handle   (posix_terminal_class_t* this, int signum);
+void posix_terminal_class_setup_term  (posix_terminal_class_t* this);
+void posix_terminal_class_restore_term(posix_terminal_class_t* this);
+
+void posix_terminal_class_sig_handle(posix_terminal_class_t* this, int signum);
+
+posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this);
+
 void                  posix_terminal_class_write_char   (posix_terminal_class_t* this, char c);
 void                  posix_terminal_class_write_cstr   (posix_terminal_class_t* this, char* s);
+
 posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this);
 
 posix_terminal_class_t posix_terminal_class_base = {
@@ -61,6 +66,7 @@ void posix_terminal_class_init(posix_terminal_class_t* this, gc_allocator_class_
      this->setup_term    = curry_func(posix_terminal_class_setup_term,    this);
      this->restore_term  = curry_func(posix_terminal_class_restore_term,  this);
      this->sig_handle    = curry_func(posix_terminal_class_sig_handle,    this);
+     this->read_key      = curry_func(posix_terminal_class_read_key,      this);
      this->write_char    = curry_func(posix_terminal_class_write_char,    this);
      this->write_cstr    = curry_func(posix_terminal_class_write_cstr,    this);
      this->get_term_size = curry_func(posix_terminal_class_get_term_size, this);
@@ -79,6 +85,9 @@ void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_cla
 
      free_curry(this->get_term_size);
      this->get_term_size = NULL;
+
+     free_curry(this->read_key);
+     this->read_key = NULL;
 
      free_curry(this->write_char);
      this->write_char = NULL;
@@ -160,6 +169,7 @@ void posix_terminal_class_write_char(posix_terminal_class_t* this, char c) {
      switch(c) {
          case '\n':
               write(STDOUT_FILENO,&c,1); // TODO - do this properly via termcap
+
          break;
          case '\r':
               write(STDOUT_FILENO,&c,1);
@@ -177,4 +187,14 @@ void posix_terminal_class_write_cstr(posix_terminal_class_t* this, char* s) {
      // of course, by using strlen(s) we ensure that nlines is never too low, but it'll usually be too high
      // see https://www.gnu.org/software/termutils/manual/termcap-1.3/html_mono/termcap.html#SEC11
      tputs(s,strlen(s),(tputs_car_callback)this->write_char);
+}
+
+posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this) {
+     char raw_c = 0;
+     read(STDIN_FILENO, &raw_c, 1);
+
+     // TODO: implement logical keys by using termcap https://www.gnu.org/software/termutils/manual/termcap-1.3/html_mono/termcap.html#SEC37
+     // come up with some sane way to quickly look up the sequences while only reading a character at a time
+     posix_keyinput_t retval = {.raw_char = raw_c, .logical_key = LOGICAL_KEY_ASCII};
+     return retval;
 }
