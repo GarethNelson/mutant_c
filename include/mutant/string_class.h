@@ -22,6 +22,7 @@
 #pragma once
 
 #include <mutant/base_class.h>
+//TODO - look into using gc/cord instead of librope
 #include <mutant/librope/rope.h>
 
 typedef struct string_class_t string_class_t;

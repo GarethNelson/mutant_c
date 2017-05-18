@@ -78,11 +78,18 @@ new stuff:
        save+restore cursor position
        clear line
        clear terminal
+       read key - should be triggered from select() to ensure there's actual input available to read
+          returns the actual character read and the type of keypress as a logical key
        write character
        write string
        write character with specific attributes
+             not a lot is actually needed here:
+                 A_NORMAL    - for all the normal stuff, duh
+                 A_DIM       - syntax hints
+                 A_BOLD      - prompt
+                 A_UNDERLINE - in the middle of string input
        write string with specific attributes
-
+             same as above
 
 
 for every character input:
