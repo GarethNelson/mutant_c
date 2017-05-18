@@ -30,8 +30,10 @@
 void string_class_init   (string_class_t* this, gc_allocator_class_t* allocator);
 void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator);
 
-void string_class_set  (string_class_t* this, char* s);
-void string_class_print(string_class_t* this);
+void string_class_set           (string_class_t* this, char* s);
+void string_class_insert_cstr_at(string_class_t* this, size_t pos, char* s);
+void string_class_append_cstr   (string_class_t* this, char* s);
+void string_class_print         (string_class_t* this);
 
 string_class_t string_class_base = {
     .Parent = {
@@ -47,8 +49,10 @@ void string_class_init(string_class_t* this, gc_allocator_class_t* allocator) {
 
      this->Parent.destroy = curry_func(string_class_destroy, this);
 
-     this->set   = curry_func(string_class_set,   this);
-     this->print = curry_func(string_class_print, this);
+     this->set            = curry_func(string_class_set,            this);
+     this->insert_cstr_at = curry_func(string_class_insert_cstr_at, this);
+     this->append_cstr    = curry_func(string_class_append_cstr,    this);
+     this->print          = curry_func(string_class_print,          this);
 
      this->s_val = rope_new2(allocator->alloc,allocator->realloc,allocator->free);
 }
@@ -59,12 +63,23 @@ void string_class_destroy(string_class_t* this, gc_allocator_class_t* allocator)
         this->s_val = NULL;
      }
 
+     free_curry(this->insert_cstr_at);
+     this->insert_cstr_at = NULL;
+
      free_curry(this->set);
      this->set = NULL; // good practice to set pointers to NULL after freeing
 
      free_curry(this->print);
      this->print = NULL;
 
+}
+
+void string_class_insert_cstr_at(string_class_t* this, size_t pos, char* s) {
+     rope_insert(this->s_val, pos, (const uint8_t*)s);
+}
+
+void string_class_append_cstr(string_class_t* this, char* s) {
+     rope_insert(this->s_val, rope_char_count(this->s_val), (const uint8_t*)s);
 }
 
 void string_class_set(string_class_t* this, char* s) {

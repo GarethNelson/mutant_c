@@ -22,6 +22,12 @@ int main(int argc, char** argv) {
     my_allocator->delete(string_a);
     string_b->set("TEST 4\n");
     string_b->print();
-
     my_allocator->delete(string_b);
+
+    string_class_t* string_c = my_allocator->new(&string_class_base);
+    string_c->set("Hi");
+    string_c->insert_cstr_at(1,"ello world, th");
+    string_c->append_cstr("s is a test\n");
+    string_c->print();
+    my_allocator->delete(string_c);
 }
