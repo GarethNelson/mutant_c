@@ -1,4 +1,89 @@
 currently this is all a big messy hack, don't even try to use it - consider it a work in progress
+  Also consider these notes the ravings of a mad man
+
+new stuff:
+    debugging:
+       due to the nature of this code, debug data can't be written to stdout - but shouldn't be anyway
+       instead, while debugging data is written to stderr and stderr can then be redirected to a file that can be monitored with "tail -f" from another terminal (or analysed later)
+    data model:
+       input represented via API as one big string
+       column position of prompt
+           stored but dynamically updated if the prompt changes, always set to length of prompt string + 2 characters (for "> ")
+       position of toplevel prompt for current input
+           stored, but dynamically updated/recalculated as required and accessed via getter function
+              when displaying the input string, position of toplevel prompt will move as new lines are displayed
+       current line count
+           if lines are added or removed, toplevel prompt position needs recalculation
+       redisplay function
+           whenever input string is updated this function is called to redisplay the input string
+           if this is the first time the redisplay has been invoked:
+              \n\r is written to the terminal
+              position of toplevel prompt is set to the current cursor position
+              as lines are displayed, toplevel prompt position is updated
+           if this is NOT the first time:
+              cursor position relative to input string is saved
+              screen cursor position is set to the saved toplevel prompt position
+           for each line in input string:
+               the cursor is set to column 0
+               if first line, toplevel prompt string is displayed followed by "> "
+               for other lines, a string consisting of spaces equal to the length of the prompt string minus 3 is displayed, followed by "> "
+           if not the first time:
+               screen cursor position is set back to the saved position
+       cursor position relative to input string (and not taking prompt into account)
+           dynamically calculated
+           take cursor row, subtract row of toplevel prompt to get the line number
+           take cursor column, subtract length of prompt string for offset into current line
+           offset into input string is current line's offset + offset into current line
+       multiple lines stored
+       for each line:
+           offset into input string
+                dynamically updated - if the previous line has characters deleted/inserted then naturally this offset changes
+           indent amount
+                basically a count of spaces in the prefix
+                dynamically calculated - NOT stored - since the spaces can be edited in realtime
+           line width
+                if wider than terminal, current display offset (for left/right scrolling on wide lines)
+    syntax hilighting, auto-indent, hints and auto-completion
+       user can hit CTRL-I to autoindent entire input string
+       each time string is updated, parse up to the current cursor offset and use current parser state to determine hints and auto-completion
+       callbacks are passed an instance of gc_allocator they are expected to use for their return values (and ideally for any internal allocations)
+       after using the return value, fancyreadline will free it
+            hints callback:
+                  use parser state to determine hints to display (for example, if parser state indicates user is in the middle of typing a function invocation, show the parameters)
+                  the callback returns a simple string
+                      if the cursor is at the end of input
+                         if the combined width of the current line (including prompt) and hints string is below terminal width: the hints string is shown (in a different colour obviously) after the cursor
+                         if the combined width would be too high to show after the cursor:
+                            if there is enough room to show just the first space-seperated token, show that after the cursor
+                         if too long, don't show the hints at all
+            auto-complete callback:
+                  returns list of possible callbacks as a list of strings, the first string is the common prefix
+                  e.g
+                      if the possible options were "fancy_guitars", "fancyreadline" and "fancy_reader":
+                         pressing tab with "fa" would return {"fancy","fancy_guitars","fancyreadline","fancy_reader",NULL}
+                         the prefix would be completed by fancyreadline by inserting "ncy" and the options "fancy_guitars", "fancyreadline" and "fancy_reader" would be displayed
+                         the user could then type _ and the callback would return {"fancy_","fancy_guitars","fancy_reader",NULL}
+                         or the user could type r (or any other part of "fancyreadline") followed by tab
+                         this would cause {"fancyreadline",NULL} to be returned
+                  if there are no possible autocompletes, the callback should return it's own input
+                  e.g
+                      nonsenseinput would return {"nonsenseinput", NULL}
+                      this would cause fancyreadline to do nothing to the input at all (since there's no work to be done to complete the prefix string)
+    POSIX terminal class
+       represent a terminal (duh)
+       basically only for use with a tty - no sockets or files or whatever the fuck else
+       setup raw mode etc
+       get width and height of terminal
+       get+set cursor position
+       save+restore cursor position
+       clear line
+       clear terminal
+       write character
+       write string
+       write character with specific attributes
+       write string with specific attributes
+
+
 
 for every character input:
     if left arrow, go back one character to the left
