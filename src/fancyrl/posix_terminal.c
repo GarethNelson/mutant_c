@@ -41,6 +41,8 @@ void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_cla
 void                  posix_terminal_class_setup_term   (posix_terminal_class_t* this);
 void                  posix_terminal_class_restore_term (posix_terminal_class_t* this);
 void                  posix_terminal_class_sig_handle   (posix_terminal_class_t* this, int signum);
+void                  posix_terminal_class_write_char   (posix_terminal_class_t* this, char c);
+void                  posix_terminal_class_write_cstr   (posix_terminal_class_t* this, char* s);
 posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this);
 
 posix_terminal_class_t posix_terminal_class_base = {
@@ -59,6 +61,8 @@ void posix_terminal_class_init(posix_terminal_class_t* this, gc_allocator_class_
      this->setup_term    = curry_func(posix_terminal_class_setup_term,    this);
      this->restore_term  = curry_func(posix_terminal_class_restore_term,  this);
      this->sig_handle    = curry_func(posix_terminal_class_sig_handle,    this);
+     this->write_char    = curry_func(posix_terminal_class_write_char,    this);
+     this->write_cstr    = curry_func(posix_terminal_class_write_cstr,    this);
      this->get_term_size = curry_func(posix_terminal_class_get_term_size, this);
 }
 
@@ -75,37 +79,102 @@ void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_cla
 
      free_curry(this->get_term_size);
      this->get_term_size = NULL;
+
+     free_curry(this->write_char);
+     this->write_char = NULL;
+
+     free_curry(this->write_cstr);
+     this->write_cstr = NULL;
 }
 
 void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
-     this->cur_size = this->get_term_size();
-     this->orig_sig_handler = signal(SIGWINCH,this->sig_handle);
-     setbuf(stdout, NULL); // alas, this can not be restored by restore_term, but that should not have any serious effects
-     tcgetattr(STDIN_FILENO,&(this->orig_termios));
-     this->cur_termios = this->orig_termios;
-     cfmakeraw(&(this->cur_termios));
-     this->cur_termios.c_cc[VMIN]  = 1;
-     this->cur_termios.c_cc[VTIME] = 0;
-     tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->cur_termios));
-     printf("\n");
-}
+     printf("\n"); // assuming normal terminal settings, this will get us to a newline so we can assume we're at column 0
 
-posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this) {
+     // we setup termcap
      char *termtype = getenv("TERM");
      char buf[2048];
      tgetent(buf,termtype);
+
+     this->output_speed = cfgetispeed(&(this->cur_stdout_termios)); // we store this in an instance member in case of future weirdness
+
+     // the below is needed by termcap's tputs and uses some magic that may not be portable outside of GNU
+     char* term_pc = NULL;
+     term_pc = tgetstr("pc",&term_pc);
+     if(term_pc == NULL) {
+        PC = 0;
+     } else {
+        PC = term_pc[0];
+     }
+     
+
+     // configure signal handler for terminal size (and get the current terminal size)
+     this->cur_size = this->get_term_size();
+     this->orig_sig_handler = signal(SIGWINCH,this->sig_handle); // TODO: implement locking (so we don't read in the middle of signal handler processing)
+
+     // turn off buffering for stdout
+     setbuf(stdout, NULL); // alas, this can not be restored by restore_term, but that should not have any serious effects
+
+     // save current settings for stdout and then copy them
+     tcgetattr(STDOUT_FILENO,&(this->orig_stdout_termios));
+     this->cur_stdout_termios = this->orig_stdout_termios;
+
+     // if we wanted to modify stdout settings, we'd do so here and then switch to them with tcsetattr
+
+     // save current settings for stdin and then copy them
+     tcgetattr(STDIN_FILENO,&(this->orig_stdin_termios));
+     this->cur_stdin_termios = this->orig_stdin_termios;
+
+     // configure raw mode for stdin and switch to the new settings
+     cfmakeraw(&(this->cur_stdin_termios));
+     this->cur_stdin_termios.c_cc[VMIN]  = 1; // we read a byte at a time
+     this->cur_stdin_termios.c_cc[VTIME] = 0; // we read in blocking mode
+     tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->cur_stdin_termios));
+}
+
+posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this) {
      posix_terminal_size_t retval = {.rows = tgetnum("li"), .cols = tgetnum("co")};
      return retval;
 
 }
 
 void posix_terminal_class_restore_term(posix_terminal_class_t* this) {
-     signal(SIGWINCH,this->orig_sig_handler);
-     tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->orig_termios));
+     signal(SIGWINCH,this->orig_sig_handler); // restore original signal handler
+
+     // restore original terminal settings
+     tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->orig_stdin_termios));
+     tcsetattr(STDOUT_FILENO,TCSANOW,&(this->orig_stdout_termios));
+
      printf("\n");
 }
 
 void posix_terminal_class_sig_handle(posix_terminal_class_t* this, int signum) {
      if(this->orig_sig_handler != NULL) this->orig_sig_handler(signum);
      this->cur_size = this->get_term_size();
+}
+
+void posix_terminal_class_write_char(posix_terminal_class_t* this, char c) {
+     // this function does NOT just write the character blindly, it first translates it if appropriate
+
+     // TODO: track cursor movements here
+
+     switch(c) {
+         case '\n':
+              write(STDOUT_FILENO,&c,1); // TODO - do this properly via termcap
+         break;
+         case '\r':
+              write(STDOUT_FILENO,&c,1);
+         break;
+         case 32 ... 126:
+              write(STDOUT_FILENO,&c,1); // basic ASCII, just dump it out
+         break;
+     }
+}
+
+typedef int (*tputs_car_callback)(int);
+void posix_terminal_class_write_cstr(posix_terminal_class_t* this, char* s) {
+     ospeed = this->output_speed;
+     // TODO - calculate nlines in a saner way - currently this is calculated as just the length of the string, which is both inefficient and probably inaccurate
+     // of course, by using strlen(s) we ensure that nlines is never too low, but it'll usually be too high
+     // see https://www.gnu.org/software/termutils/manual/termcap-1.3/html_mono/termcap.html#SEC11
+     tputs(s,strlen(s),(tputs_car_callback)this->write_char);
 }

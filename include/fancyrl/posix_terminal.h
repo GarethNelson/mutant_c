@@ -63,6 +63,7 @@ typedef enum {
      LOGICAL_KEY_HOME      = 9,  // go to start of expression
      LOGICAL_KEY_END       = 10, // go to end of expression
      LOGICAL_KEY_CTRL_L    = 11, // clear screen (this will NOT clear the current expression if one is being edited)
+     LOGICAL_KEY_CTRL_C    = 12, // ctrl-c - we need our own special handler for this in raw mode
 } posix_logical_key_t;
 
 typedef struct posix_keyinput_t {
@@ -79,8 +80,13 @@ typedef struct posix_terminal_class_t {
     posix_terminal_cur_pos_t cur_curpos;   // currently known cursor position, don't access directly
     posix_terminal_cur_pos_t saved_curpos; // saved cursor position - this is SCREEN position, not relative to input string (cos this class doesn't know about input string)
 
-    struct termios orig_termios; // original terminal settings
-    struct termios cur_termios;  // current terminal settings (used by fancyrl)
+    struct termios orig_stdin_termios; // original terminal settings
+    struct termios orig_stdout_termios;
+
+    struct termios cur_stdin_termios;         // current terminal settings (used by fancyrl)
+    struct termios cur_stdout_termios;
+
+    speed_t output_speed; // terminal output speed - this IS important, believe it or not
 
     void (*orig_sig_handler)(int signum); // original signal handler (so we can restore it in restore_term())
 
