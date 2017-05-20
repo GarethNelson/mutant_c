@@ -9,6 +9,8 @@
 #include <malloc.h>
 #include <termios.h>
 
+#include <stdbool.h>
+
 #include "utlist.h"
 
 struct termios orig_termios;
@@ -22,11 +24,13 @@ typedef enum token_type_t {
     TOKEN_RPAREN,
     TOKEN_SYMBOL,
     TOKEN_STRING,
+    TOKEN_INT,
 } token_type_t;
 
 typedef struct token_list_t {
     token_type_t type;
     char* s_val;
+    int   i_val;
     struct token_list_t* next;
 } token_list_t;
 
@@ -46,10 +50,24 @@ void setraw() {
 
 }
 
+bool is_int(char* s) {
+     while(*s) {
+       if(!(isdigit(*s))) return false;
+       s++;
+     }
+     return true;
+}
+
 void emit_token(token_type_t type, char* val) {
      token_list_t* new_token = calloc(sizeof(token_list_t),1);
      new_token->type = type;
      new_token->s_val = strdup(val);
+     if(type == TOKEN_SYMBOL) {
+        if(is_int(val)) {
+           new_token->type = TOKEN_INT;
+           new_token->i_val = atoi(val);
+        }
+     }
      LL_APPEND(parsed_tokens,new_token);
 }
 
@@ -60,6 +78,14 @@ typedef enum {
     IN_STRING_ESCAPE = 3,
 } parse_state_t;
 
+void dump_state() {
+     token_list_t* t;
+     int count;
+     printf("\033[2J\033[H");
+     fflush(stdout);
+     LL_COUNT(parsed_tokens,t,count);
+     printf("%d parsed tokens\n\r",count);
+}
 
 int main(int argc, char** argv) {
     setraw();
@@ -76,12 +102,17 @@ int main(int argc, char** argv) {
 
     for(;;) {
         in_char = getchar();
-        oldsize = strlen(exprbuf);
-        exprbuf = realloc(exprbuf,oldsize+2);
-        exprbuf[oldsize] = in_char;
-        exprbuf[oldsize+1] = 0;
-        printf("\033[2J\033[H");
-        fflush(stdout);
+        if(in_char == '\n' || in_char=='\r') {
+          dump_state();
+        } else {
+          oldsize = strlen(exprbuf);
+          exprbuf = realloc(exprbuf,oldsize+2);
+          exprbuf[oldsize] = in_char;
+          exprbuf[oldsize+1] = 0;
+          printf("\033[2J\033[H");
+          fflush(stdout);
+        }
+
         switch(cur_state) {        
            case START:
                 switch(in_char) {
@@ -92,6 +123,10 @@ int main(int argc, char** argv) {
                        emit_token(TOKEN_RPAREN,")");
                    break;
                    case ' ':
+                   break;
+                   case '\r':
+                   break;
+                   case '\n':
                    break;
                    case '"':
                        cur_state = IN_STRING;
@@ -156,6 +191,9 @@ int main(int argc, char** argv) {
               break;
               case TOKEN_RPAREN:
                    printf(" ) ");
+              break;
+              case TOKEN_INT:
+                   printf(" INT(%d) ",t->i_val);
               break;
               case TOKEN_STRING:
                    printf(" STRING(\"%s\") ",t->s_val);
