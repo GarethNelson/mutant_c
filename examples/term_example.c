@@ -122,9 +122,6 @@ int main(int argc, char** argv) {
 
     char in_char = char_read(term);
 
-    snprintf(outbuf,128,"You pressed %d\n",in_char); 
-    term->write_cstr(outbuf);
-
     term->restore_term();
     my_allocator->delete(term);
 }

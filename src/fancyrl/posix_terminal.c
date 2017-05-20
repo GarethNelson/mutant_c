@@ -256,6 +256,8 @@ posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this) {
      TermKeyKey    tk_key;
      tk_result = termkey_getkey(this->tk,&tk_key);
 
+     retval.logical_key = LOGICAL_KEY_UNKNOWN;
+
      while(tk_result==TERMKEY_RES_AGAIN) {
         read(STDIN_FILENO, &raw_c, 1);
         termkey_push_bytes(this->tk,(const char*)&raw_c, 1);
@@ -263,7 +265,12 @@ posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this) {
      }
      switch(tk_key.type) {
          case TERMKEY_TYPE_UNICODE:
-              fprintf(stderr,"UNICODE");
+              if((tk_key.code.codepoint == 'l') && (tk_key.modifiers & TERMKEY_KEYMOD_CTRL)) {
+                 retval.logical_key = LOGICAL_KEY_CTRL_L;
+              }
+              if((tk_key.code.codepoint == 'c') && (tk_key.modifiers & TERMKEY_KEYMOD_CTRL)) {
+                 retval.logical_key = LOGICAL_KEY_CTRL_C;
+              }              
          break;
          case TERMKEY_TYPE_FUNCTION:
               fprintf(stderr,"FUNCTION");
