@@ -19,6 +19,23 @@ struct termios cur_termios;
 char *exprbuf = NULL;
 char *tokens  = NULL;
 
+typedef enum parsed_val_type_t {
+    VAL_CONS,
+    VAL_SYMBOL,
+    VAL_STR,
+    VAL_INT,
+} parsed_val_type_t;
+
+typedef struct parsed_val_t parsed_val_t;
+typedef struct parsed_val_t {
+    parsed_val_type_t type;
+    int   i_val;
+    char* s_val;
+
+    parsed_val_t* car;
+    parsed_val_t* cdr;
+} parsed_val_t;
+
 typedef enum token_type_t {
     TOKEN_LPAREN,
     TOKEN_RPAREN,
@@ -35,6 +52,7 @@ typedef struct token_list_t {
 } token_list_t;
 
 token_list_t *parsed_tokens = NULL;
+parsed_val_t *parsed_ast    = NULL;
 
 void setraw() {
      setvbuf(stdout, NULL, _IONBF, BUFSIZ);
@@ -78,6 +96,102 @@ typedef enum {
     IN_STRING_ESCAPE = 3,
 } parse_state_t;
 
+parsed_val_t* list_last(parsed_val_t* list) {
+     parsed_val_t* c = list;
+     while(c->cdr != NULL) {
+        c = c->cdr;
+     }
+     return c;
+}
+
+parsed_val_t* list_append(parsed_val_t* list, parsed_val_t* v) {
+     if(v==NULL) return list;
+     if(list->car == NULL) {
+        list->car = v;
+        return list;
+     }
+     parsed_val_t* new_cons = calloc(sizeof(parsed_val_t),1);
+     new_cons->type = VAL_CONS;
+     new_cons->car  = v;
+     new_cons->cdr  = NULL;
+     list_last(list)->cdr = new_cons;
+     return list;
+}
+
+parsed_val_t* read_form(token_list_t** t);
+parsed_val_t* read_list(token_list_t** t) {
+     parsed_val_t* retval = calloc(sizeof(parsed_val_t),1);
+     retval->type = VAL_CONS;
+     retval->car  = NULL;
+     retval->cdr  = NULL;
+     while(*t != NULL) {
+        if((*t)->type == TOKEN_RPAREN) return retval;
+        if(t != NULL) {
+           list_append(retval,read_form(t));
+        }
+        *t = (*t)->next;
+     }
+     return retval;
+}
+
+parsed_val_t* read_form(token_list_t** t) {
+     if(t==NULL) return NULL;
+     parsed_val_t* retval = calloc(sizeof(parsed_val_t),1);
+     switch((*t)->type) {
+              case TOKEN_LPAREN:
+                   free(retval);
+                   *t = (*t)->next;
+                   return read_list(t);
+              break;
+              case TOKEN_RPAREN:
+                   fprintf(stderr,"Syntax error!");
+                   return NULL;
+              break;
+              case TOKEN_INT:
+                   retval->type = VAL_INT;
+                   retval->i_val = (*t)->i_val;
+                   return retval;
+              break;
+              case TOKEN_STRING:
+                   retval->type = VAL_STR;
+                   retval->s_val = (*t)->s_val;
+                   return retval;
+              break;
+              case TOKEN_SYMBOL:
+                   retval->type = VAL_SYMBOL;
+                   retval->s_val = (*t)->s_val;
+                   return retval;
+              break;
+
+     }
+     return NULL;
+}
+
+void dump_val(parsed_val_t* v) {
+     if(v==NULL) printf("nil");
+     switch(v->type) {
+        case VAL_STR:
+           printf("\"%s\"", v->s_val);
+        break;
+        case VAL_INT:
+           printf("%d",v->i_val);
+        break;
+        case VAL_SYMBOL:
+           printf("%s",v->s_val);
+        break;
+        case VAL_CONS:
+           printf("(");
+           parsed_val_t* c = v;
+           while(c != NULL) {
+              if(c->car != NULL) dump_val(c->car);
+              if(c->cdr != NULL) printf(" ");
+              c = c->cdr;
+           }
+           printf(")");
+        break;
+     }
+}
+
 void dump_state() {
      token_list_t* t;
      int count;
@@ -85,6 +199,8 @@ void dump_state() {
      fflush(stdout);
      LL_COUNT(parsed_tokens,t,count);
      printf("%d parsed tokens\n\r",count);
+     parsed_ast = read_form(&parsed_tokens);
+     dump_val(parsed_ast);
 }
 
 int main(int argc, char** argv) {
@@ -183,7 +299,7 @@ int main(int argc, char** argv) {
         }
         fflush(stdout);
         printf("\n\r");
-        token_list_t* t;
+     /*   token_list_t* t;
         LL_FOREACH(parsed_tokens,t) {
            switch(t->type) {
               case TOKEN_LPAREN:
@@ -202,7 +318,7 @@ int main(int argc, char** argv) {
                    printf(" SYMBOL(%s) ", t->s_val);
               break;
            }
-        }
+        }*/
         printf("\n\r%s",exprbuf);
         fflush(stdout);
     }
