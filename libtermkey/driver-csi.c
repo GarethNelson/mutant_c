@@ -267,12 +267,21 @@ static TermKeyResult handle_csi_R(TermKey *tk, TermKeyKey *key, int cmd, long *a
 {
   switch(cmd) {
     case 'R'|'?'<<8:
-      if(args < 2)
-        return TERMKEY_RES_NONE;
+ switch(args) {
+        case 0:
+          key->type = TERMKEY_TYPE_FUNCTION;
+          key->code.number = 3;
+          return TERMKEY_RES_KEY;
 
-      key->type = TERMKEY_TYPE_POSITION;
-      termkey_key_set_linecol(key, arg[1], arg[0]);
-      return TERMKEY_RES_KEY;
+        case 2:
+          key->type = TERMKEY_TYPE_POSITION;
+          termkey_key_set_linecol(key, arg[1], arg[0]);
+          return TERMKEY_RES_KEY;
+
+        default:
+          return TERMKEY_RES_NONE;
+      }
+
 
     default:
       return handle_csi_ss3_full(tk, key, cmd, arg, args);

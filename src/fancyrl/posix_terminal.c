@@ -33,6 +33,7 @@
 #include <stdio.h>
 
 #include <unistd.h>
+#include <sys/ioctl.h>
 
 #include <termios.h>
 #include <termcap.h>
@@ -50,7 +51,9 @@ posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this);
 void                  posix_terminal_class_write_char   (posix_terminal_class_t* this, char c);
 void                  posix_terminal_class_write_cstr   (posix_terminal_class_t* this, char* s);
 
-posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this);
+posix_terminal_size_t    posix_terminal_class_get_term_size(posix_terminal_class_t* this);
+posix_terminal_cur_pos_t posix_terminal_class_get_cur_pos(posix_terminal_class_t* this);
+
 
 posix_terminal_class_t posix_terminal_class_base = {
     .Parent = {
@@ -72,6 +75,7 @@ void posix_terminal_class_init(posix_terminal_class_t* this, gc_allocator_class_
      this->write_char    = curry_func(posix_terminal_class_write_char,    this);
      this->write_cstr    = curry_func(posix_terminal_class_write_cstr,    this);
      this->get_term_size = curry_func(posix_terminal_class_get_term_size, this);
+     this->get_cur_pos   = curry_func(posix_terminal_class_get_cur_pos,   this);
 }
 
 // WARNING: this does NOT restore the terminal back to original settings, it's only a memory deallocation thing
@@ -87,6 +91,9 @@ void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_cla
 
      free_curry(this->get_term_size);
      this->get_term_size = NULL;
+
+     free_curry(this->get_cur_pos);
+     this->get_cur_pos = NULL;
 
      free_curry(this->read_key);
      this->read_key = NULL;
@@ -132,6 +139,7 @@ void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
      this->cur_stdout_termios = this->orig_stdout_termios;
 
      // if we wanted to modify stdout settings, we'd do so here and then switch to them with tcsetattr
+     tcsetattr(STDOUT_FILENO,TCSANOW,&(this->cur_stdout_termios));
 
      // save current settings for stdin and then copy them
      tcgetattr(STDIN_FILENO,&(this->orig_stdin_termios));
@@ -149,8 +157,30 @@ void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
 
 }
 
+posix_terminal_cur_pos_t posix_terminal_class_get_cur_pos(posix_terminal_class_t* this) {
+    // shamelessly ripped from linenoise - see https://github.com/antirez/linenoise/blob/master/linenoise.c
+    char buf[32];
+    unsigned int i = 0;
+
+    write(STDOUT_FILENO, "\x1b[6n", 4);
+
+    /* Read the response: ESC [ rows ; cols R */
+    while (i < sizeof(buf)-1) {
+        if (read(STDOUT_FILENO,buf+i,1) != 1) break;
+        if (buf[i] == 'R') break;
+        i++;
+    }
+    buf[i] = '\0';
+
+   posix_terminal_cur_pos_t retval;
+   sscanf(buf+2,"%d;%d",&(retval.cur_row),&(retval.cur_col));
+   return retval;
+}
+
 posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this) {
-     posix_terminal_size_t retval = {.rows = tgetnum("li"), .cols = tgetnum("co")};
+     struct winsize sz;
+     ioctl(0, TIOCGWINSZ, &sz);
+     posix_terminal_size_t retval = {.rows=sz.ws_row, .cols = sz.ws_col};
      return retval;
 
 }
@@ -174,8 +204,6 @@ void posix_terminal_class_sig_handle(posix_terminal_class_t* this, int signum) {
 void posix_terminal_class_write_char(posix_terminal_class_t* this, char c) {
      // this function does NOT just write the character blindly, it first translates it if appropriate
 
-     // TODO: track cursor movements here
-
      switch(c) {
          case '\n':
               write(STDOUT_FILENO,&c,1); // TODO - do this properly via termcap
@@ -197,6 +225,7 @@ void posix_terminal_class_write_cstr(posix_terminal_class_t* this, char* s) {
      // of course, by using strlen(s) we ensure that nlines is never too low, but it'll usually be too high
      // see https://www.gnu.org/software/termutils/manual/termcap-1.3/html_mono/termcap.html#SEC11
      tputs(s,strlen(s),(tputs_car_callback)this->write_char);
+
 }
 
 posix_logical_key_t termkey_sym_to_logicalkey(TermKeySym s) {
@@ -282,5 +311,6 @@ posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this) {
               fprintf(stderr,"POSITION");
          break;
      }
+
      return retval;
 }

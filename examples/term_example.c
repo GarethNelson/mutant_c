@@ -8,10 +8,21 @@
 #include <mutant/string_class.h>
 #include <fancyrl/posix_terminal.h>
 
+int idle_cycles=0;
+
 void idle(posix_terminal_class_t* term) {
+       term->write_char('.');
+       idle_cycles++;
+       char outbuf[128];
      // we use this idle function to print dots to the output while waiting on the user
      // in real applications idle functions should be used for stuff like garbage collection etc
-     term->write_char('.');
+
+       if(idle_cycles > 10) {
+          posix_terminal_cur_pos_t curpos = term->get_cur_pos();
+          snprintf(outbuf,128,"Cursor is at %d,%d",curpos.cur_row,curpos.cur_col);
+          term->write_cstr(outbuf);
+          idle_cycles=0;
+       }
 }
 
 char char_read(posix_terminal_class_t* term) {
@@ -23,8 +34,9 @@ char char_read(posix_terminal_class_t* term) {
      struct timeval tv;
      posix_keyinput_t in_key;
      for(;;) {
-         tv.tv_sec  = 0;
+         tv.tv_usec = 0;
          tv.tv_usec = 200000; // this enables us to run an idle() function 5 times per second
+
          FD_ZERO(&fds);
          FD_SET(STDIN_FILENO, &fds);
          r = select(FD_SETSIZE, &fds, NULL, NULL, &tv);
@@ -120,8 +132,15 @@ int main(int argc, char** argv) {
 
     term->write_cstr("Press a key, any key");
 
-    char in_char = char_read(term);
+    for(;;) {
+       char in_char = char_read(term);
+       term_size = term->get_term_size();
+       snprintf(outbuf,128,"\n\rTerminal is %dX%d\n\r", term_size.rows, term_size.cols);
+       term->write_cstr(outbuf);
+
+    }
 
     term->restore_term();
     my_allocator->delete(term);
+    my_allocator->free(outbuf);
 }
