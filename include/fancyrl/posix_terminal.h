@@ -27,6 +27,8 @@
 #include <termios.h>
 #include <signal.h>
 
+#include <termkey.h>
+
 // the below is NOT a class
 typedef struct posix_terminal_size_t {
     unsigned int rows;
@@ -75,6 +77,8 @@ typedef struct posix_keyinput_t {
 typedef struct posix_terminal_class_t posix_terminal_class_t;
 typedef struct posix_terminal_class_t {
     base_class_t Parent;
+
+    TermKey *tk; // used for libtermkey
 
     posix_terminal_size_t cur_size;        // currently known terminal size, don't access directly
     posix_terminal_cur_pos_t cur_curpos;   // currently known cursor position, don't access directly

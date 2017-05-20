@@ -25,6 +25,8 @@
 #include <mutant/curry_func.h>
 #include <mutant/gc_allocator_class.h>
 
+#include <termkey.h>
+
 #include <signal.h>
 #include <string.h>
 #include <stdlib.h>
@@ -94,6 +96,8 @@ void posix_terminal_class_destroy(posix_terminal_class_t* this, gc_allocator_cla
 
      free_curry(this->write_cstr);
      this->write_cstr = NULL;
+
+     termkey_destroy(this->tk);
 }
 
 void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
@@ -104,7 +108,7 @@ void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
      char buf[2048];
      tgetent(buf,termtype);
 
-     this->output_speed = cfgetispeed(&(this->cur_stdout_termios)); // we store this in an instance member in case of future weirdness
+     this->output_speed = cfgetospeed(&(this->cur_stdout_termios)); // we store this in an instance member in case of future weirdness
 
      // the below is needed by termcap's tputs and uses some magic that may not be portable outside of GNU
      char* term_pc = NULL;
@@ -138,6 +142,11 @@ void posix_terminal_class_setup_term(posix_terminal_class_t* this) {
      this->cur_stdin_termios.c_cc[VMIN]  = 1; // we read a byte at a time
      this->cur_stdin_termios.c_cc[VTIME] = 0; // we read in blocking mode
      tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->cur_stdin_termios));
+
+     // start termkey
+     this->tk = termkey_new_abstract(termtype,TERMKEY_FLAG_NOTERMIOS|TERMKEY_FLAG_CTRLC);
+
+
 }
 
 posix_terminal_size_t posix_terminal_class_get_term_size(posix_terminal_class_t* this) {
@@ -153,6 +162,7 @@ void posix_terminal_class_restore_term(posix_terminal_class_t* this) {
      tcsetattr(STDIN_FILENO,TCSAFLUSH,&(this->orig_stdin_termios));
      tcsetattr(STDOUT_FILENO,TCSANOW,&(this->orig_stdout_termios));
 
+     termkey_stop(this->tk);
      printf("\n");
 }
 
@@ -189,12 +199,81 @@ void posix_terminal_class_write_cstr(posix_terminal_class_t* this, char* s) {
      tputs(s,strlen(s),(tputs_car_callback)this->write_char);
 }
 
+posix_logical_key_t termkey_sym_to_logicalkey(TermKeySym s) {
+     switch(s) {
+           case TERMKEY_SYM_UNKNOWN:
+                return LOGICAL_KEY_UNKNOWN;
+           break;
+           case TERMKEY_SYM_TAB:
+                return LOGICAL_KEY_TAB;
+           break;
+           case TERMKEY_SYM_ENTER:
+                return LOGICAL_KEY_ENTER;
+           break;
+           case TERMKEY_SYM_DEL:
+                return LOGICAL_KEY_DEL;
+           break;
+           case TERMKEY_SYM_BACKSPACE:
+                return LOGICAL_KEY_BACKSPACE;
+           break;
+           case TERMKEY_SYM_UP:
+                return LOGICAL_KEY_UP;
+           break;
+           case TERMKEY_SYM_DOWN:
+                return LOGICAL_KEY_DOWN;
+           break;
+           case TERMKEY_SYM_LEFT:
+                return LOGICAL_KEY_LEFT;
+           break;
+           case TERMKEY_SYM_RIGHT:
+                return LOGICAL_KEY_RIGHT;
+           break;
+           case TERMKEY_SYM_HOME:
+                return LOGICAL_KEY_HOME;
+           break;
+           case TERMKEY_SYM_END:
+                return LOGICAL_KEY_END;
+           break;
+     }
+     return LOGICAL_KEY_UNKNOWN;
+}
+
 posix_keyinput_t posix_terminal_class_read_key(posix_terminal_class_t* this) {
      char raw_c = 0;
      read(STDIN_FILENO, &raw_c, 1);
+     posix_keyinput_t retval;
+     retval.raw_char = raw_c;
 
-     // TODO: implement logical keys by using termcap https://www.gnu.org/software/termutils/manual/termcap-1.3/html_mono/termcap.html#SEC37
-     // come up with some sane way to quickly look up the sequences while only reading a character at a time
-     posix_keyinput_t retval = {.raw_char = raw_c, .logical_key = LOGICAL_KEY_ASCII};
+     if( (raw_c >= 32) && (raw_c <= 126)) {
+         retval.logical_key = LOGICAL_KEY_ASCII;
+         return retval;
+     }
+
+     char buf[100];
+
+     termkey_push_bytes(this->tk,(const char *)&raw_c, 1); 
+     TermKeyResult tk_result;
+     TermKeyKey    tk_key;
+     tk_result = termkey_getkey(this->tk,&tk_key);
+
+     while(tk_result==TERMKEY_RES_AGAIN) {
+        read(STDIN_FILENO, &raw_c, 1);
+        termkey_push_bytes(this->tk,(const char*)&raw_c, 1);
+        tk_result = termkey_getkey(this->tk,&tk_key);
+     }
+     switch(tk_key.type) {
+         case TERMKEY_TYPE_UNICODE:
+              fprintf(stderr,"UNICODE");
+         break;
+         case TERMKEY_TYPE_FUNCTION:
+              fprintf(stderr,"FUNCTION");
+         break;
+         case TERMKEY_TYPE_KEYSYM:
+              retval.logical_key = termkey_sym_to_logicalkey(tk_key.code.sym);
+         break;
+         case TERMKEY_TYPE_POSITION:
+              fprintf(stderr,"POSITION");
+         break;
+     }
      return retval;
 }

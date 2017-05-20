@@ -15,7 +15,7 @@ add_library(mutant SHARED ${LIBMUTANT_SOURCE})
 target_link_libraries(mutant gc)
 
 add_library(fancyrl SHARED ${LIBFANCYRL_SOURCE})
-target_link_libraries(fancyrl mutant termcap)
+target_link_libraries(fancyrl mutant termcap termkey)
 
 add_executable(str_example ${CMAKE_SOURCE_DIR}/examples/str_example.c)
 target_link_libraries(str_example mutant)
