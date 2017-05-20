@@ -91,6 +91,13 @@ new stuff:
        write string with specific attributes
              same as above
 
+s-expression parser
+    parse state
+         for completed expressions, an AST is made available
+         
+    take as input the current parse state, current input string and a single character
+         return new parse state
+
 
 for every character input:
     if left arrow, go back one character to the left
