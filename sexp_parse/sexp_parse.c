@@ -9,11 +9,28 @@
 #include <malloc.h>
 #include <termios.h>
 
+#include "utlist.h"
+
 struct termios orig_termios;
 struct termios cur_termios;
 
 char *exprbuf = NULL;
 char *tokens  = NULL;
+
+typedef enum token_type_t {
+    TOKEN_LPAREN,
+    TOKEN_RPAREN,
+    TOKEN_SYMBOL,
+    TOKEN_STRING,
+} token_type_t;
+
+typedef struct token_list_t {
+    token_type_t type;
+    char* s_val;
+    struct token_list_t* next;
+} token_list_t;
+
+token_list_t *parsed_tokens = NULL;
 
 void setraw() {
      setvbuf(stdout, NULL, _IONBF, BUFSIZ);
@@ -29,18 +46,18 @@ void setraw() {
 
 }
 
-void emit_token(char* token) {
-     size_t old_s_size = strlen(tokens);
-     char* new_tokens = calloc(sizeof(char),old_s_size+strlen(token)+2);
-     snprintf(new_tokens,old_s_size+strlen(token)+2,"%s %s ",tokens,token);
-     free(tokens);
-     tokens = new_tokens;
+void emit_token(token_type_t type, char* val) {
+     token_list_t* new_token = calloc(sizeof(token_list_t),1);
+     new_token->type = type;
+     new_token->s_val = strdup(val);
+     LL_APPEND(parsed_tokens,new_token);
 }
 
 typedef enum {
     START     = 0,
     IN_STRING = 1,
     IN_SYMBOL = 2,
+    IN_STRING_ESCAPE = 3,
 } parse_state_t;
 
 
@@ -64,15 +81,15 @@ int main(int argc, char** argv) {
         exprbuf[oldsize] = in_char;
         exprbuf[oldsize+1] = 0;
         printf("\033[2J\033[H");
-
+        fflush(stdout);
         switch(cur_state) {        
            case START:
                 switch(in_char) {
                    case '(':
-                       emit_token("LPAREN");
+                       emit_token(TOKEN_LPAREN,"(");
                    break;
                    case ')':
-                       emit_token("RPAREN");
+                       emit_token(TOKEN_RPAREN,")");
                    break;
                    case ' ':
                    break;
@@ -84,18 +101,24 @@ int main(int argc, char** argv) {
                        cur_state = IN_SYMBOL;
                        s_val_buf = calloc(sizeof(char),1024);
                        s_val_buf[0] = in_char;
+                       s_val_buf[strlen(s_val_buf)+1]=0;
                    break;
                 }
            break;
+           case IN_STRING_ESCAPE:
+                s_val_buf[strlen(s_val_buf)]=in_char;
+                s_val_buf[strlen(s_val_buf)+1]=0;
+                cur_state = IN_STRING;
+           break;
            case IN_STRING:
                 switch(in_char) {
+                   case '\\':
+                        cur_state = IN_STRING_ESCAPE;
+                   break;
                    case '"':
-                        tmpbuf = (char*)calloc(sizeof(char),strlen(s_val_buf)+12);
-                        snprintf(tmpbuf,strlen(s_val_buf)+12,"STRING(\"%s\")",s_val_buf);
-                        cur_state = START;
-                        emit_token(tmpbuf);
-                        free(tmpbuf);
+                        emit_token(TOKEN_STRING,s_val_buf);
                         free(s_val_buf);
+                        cur_state = START;
                    break;
                    default:
                         s_val_buf[strlen(s_val_buf)]=in_char;
@@ -106,21 +129,15 @@ int main(int argc, char** argv) {
            case IN_SYMBOL:
                 switch(in_char) {
                  case ')':
-                        tmpbuf = (char*)calloc(sizeof(char),strlen(s_val_buf)+12);
-                        snprintf(tmpbuf,strlen(s_val_buf)+12,"SYMBOL(\"%s\")",s_val_buf);
-                        cur_state = START;
-                        emit_token(tmpbuf);
-                        free(tmpbuf);
+                        emit_token(TOKEN_SYMBOL,s_val_buf);
                         free(s_val_buf);
-                        emit_token("RPAREN");
+                        emit_token(TOKEN_RPAREN,")");
+                        cur_state = START;
                  break;
                  case ' ':
-                        tmpbuf = (char*)calloc(sizeof(char),strlen(s_val_buf)+12);
-                        snprintf(tmpbuf,strlen(s_val_buf)+12,"SYMBOL(\"%s\")",s_val_buf);
-                        cur_state = START;
-                        emit_token(tmpbuf);
-                        free(tmpbuf);
+                        emit_token(TOKEN_SYMBOL,s_val_buf);
                         free(s_val_buf);
+                        cur_state = START;
                 break;
                 default:
                         s_val_buf[strlen(s_val_buf)]=in_char;
@@ -130,7 +147,25 @@ int main(int argc, char** argv) {
            break;
         }
         fflush(stdout);
-        printf("%s\n\r%s",tokens,exprbuf);
+        printf("\n\r");
+        token_list_t* t;
+        LL_FOREACH(parsed_tokens,t) {
+           switch(t->type) {
+              case TOKEN_LPAREN:
+                   printf(" ( ");
+              break;
+              case TOKEN_RPAREN:
+                   printf(" ) ");
+              break;
+              case TOKEN_STRING:
+                   printf(" STRING(\"%s\") ",t->s_val);
+              break;
+              case TOKEN_SYMBOL:
+                   printf(" SYMBOL(%s) ", t->s_val);
+              break;
+           }
+        }
+        printf("\n\r%s",exprbuf);
         fflush(stdout);
     }
 }
