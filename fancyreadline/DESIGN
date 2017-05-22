@@ -7,7 +7,7 @@ new stuff:
        instead, while debugging data is written to stderr and stderr can then be redirected to a file that can be monitored with "tail -f" from another terminal (or analysed later)
     data model:
        input represented via API as one big string
-       column position of prompt
+       column position of text after prompt
            stored but dynamically updated if the prompt changes, always set to length of prompt string + 2 characters (for "> ")
        position of toplevel prompt for current input
            stored, but dynamically updated/recalculated as required and accessed via getter function
@@ -92,11 +92,12 @@ new stuff:
              same as above
 
 s-expression parser
-    parse state
-         for completed expressions, an AST is made available
-         
-    take as input the current parse state, current input string and a single character
-         return new parse state
+    params: parser state (can be NULL if first call), string to read, length to read up to
+    reads whole strings up to a particular length (if length is 0, whole string is read)
+    returns parser state
+    parser state:
+        copy of string
+        tokens list - tagged with filename, line number and character offset on line
 
 
 for every character input:
