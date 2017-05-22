@@ -22,7 +22,14 @@
 #include <sys/mman.h>
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 
+#include <gc.h>
+
+#include <limits.h>
+#ifndef PAGESIZE
+#define PAGESIZE 4096
+#endif
 
 // how this works in brief:
 //     function calls come into this code with params passed in registers (like any other C function) RDI, RSI, RDX, RCX, R8, R9
@@ -69,8 +76,16 @@ static unsigned char curry_tramp_x86_64_code[] = {
 #define CURRY_TRAMP_PARAMPTR_TYPE  uint64_t
 #define CURRY_TRAMP_FUNCPTR_TYPE   uint64_t
 
+void* curry_alloc() {
+      void* retval = NULL;
+      retval = GC_MALLOC(sizeof(CURRY_TRAMP)+PAGESIZE);
+      uint64_t ptr  = ((uint64_t)retval+PAGESIZE) & ~ (uint64_t)PAGESIZE;
+      mprotect((void*)ptr, sizeof(CURRY_TRAMP), PROT_READ | PROT_WRITE);
+      return (void*)ptr;
+}
+
 void* curry_func(void* func, void* param) {
-      void* curry_mem            = mmap(NULL, sizeof(CURRY_TRAMP), PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+      void* curry_mem = curry_alloc();
       unsigned char *mapped_code = (unsigned char*)curry_mem;
 
       memcpy(curry_mem, CURRY_TRAMP, sizeof(CURRY_TRAMP));
@@ -87,5 +102,8 @@ void* curry_func(void* func, void* param) {
 }
 
 void free_curry(void* func) {
-     munmap(func, sizeof(CURRY_TRAMP));
+     void* base = GC_base(func);
+     uint64_t ptr  = ((uint64_t)base+PAGESIZE) & ~ (uint64_t)PAGESIZE;
+     mprotect((void*)ptr, sizeof(CURRY_TRAMP), PROT_READ | PROT_WRITE);
+     GC_FREE(base);
 }
